@@ -1,41 +1,40 @@
-var Waterline = require('../../../lib/waterline');
-var assert = require('assert');
+var Waterline = require('../../../lib/waterline'),
+    assert = require('assert');
 
 describe('.beforeCreate()', function() {
+
   describe('basic function', function() {
+
+    /**
+     * findOrCreate
+     */
+
     describe('.findOrCreate()', function() {
+
       describe('without a record', function() {
         var person;
 
         before(function(done) {
           var waterline = new Waterline();
-          var Model = Waterline.Model.extend({
+          var Model = Waterline.Collection.extend({
             identity: 'user',
-            datastore: 'foo',
-            primaryKey: 'id',
-            fetchRecordsOnCreate: true,
-            fetchRecordsOnCreateEach: true,
+            connection: 'foo',
             attributes: {
-              id: {
-                type: 'number'
-              },
-              name: {
-                type: 'string'
-              }
+              name: 'string'
             },
 
             beforeCreate: function(values, cb) {
               values.name = values.name + ' updated';
-              return cb();
+              cb();
             }
           });
 
-          waterline.registerModel(Model);
+          waterline.loadCollection(Model);
 
           // Fixture Adapter Def
           var adapterDef = {
-            find: function(con, query, cb) { return cb(null, null); },
-            create: function(con, query, cb) { return cb(null, query.newRecord); }
+            find: function(con, col, criteria, cb) { return cb(null, null); },
+            create: function(con, col, values, cb) { return cb(null, values); }
           };
 
           var connections = {
@@ -44,26 +43,18 @@ describe('.beforeCreate()', function() {
             }
           };
 
-          waterline.initialize({ adapters: { foobar: adapterDef }, datastores: connections }, function(err, orm) {
-            if (err) {
-              return done(err);
-            }
-
-            person = orm.collections.user;
-
-            return done();
+          waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+            if(err) done(err);
+            person = colls.collections.user;
+            done();
           });
         });
 
         it('should run beforeCreate and mutate values on create', function(done) {
-          person.findOrCreate({ name: 'test' }, { name: 'test', id: 1 }, function(err, user) {
-            if (err) {
-              return done(err);
-            }
-
-            assert.equal(user.name, 'test updated');
-
-            return done();
+          person.findOrCreate({ name: 'test' }, { name: 'test' }, function(err, user) {
+            assert(!err);
+            assert(user.name === 'test updated');
+            done();
           });
         });
       });
@@ -73,31 +64,25 @@ describe('.beforeCreate()', function() {
 
         before(function(done) {
           var waterline = new Waterline();
-          var Model = Waterline.Model.extend({
+          var Model = Waterline.Collection.extend({
             identity: 'user',
-            datastore: 'foo',
-            primaryKey: 'id',
+            connection: 'foo',
             attributes: {
-              id: {
-                type: 'number'
-              },
-              name: {
-                type: 'string'
-              }
+              name: 'string'
             },
 
             beforeCreate: function(values, cb) {
               values.name = values.name + ' updated';
-              return cb();
+              cb();
             }
           });
 
-          waterline.registerModel(Model);
+          waterline.loadCollection(Model);
 
           // Fixture Adapter Def
           var adapterDef = {
-            find: function(con, query, cb) { return cb(null, [{ name: 'test', id: 1}] ); },
-            create: function(con, query, cb) { return cb(null, query.newRecord); }
+            find: function(con, col, criteria, cb) { return cb(null, [criteria.where]); },
+            create: function(con, col, values, cb) { return cb(null, values); }
           };
 
           var connections = {
@@ -106,29 +91,147 @@ describe('.beforeCreate()', function() {
             }
           };
 
-          waterline.initialize({ adapters: { foobar: adapterDef }, datastores: connections }, function(err, orm) {
-            if (err) {
-              return done(err);
-            }
-
-            person = orm.collections.user;
-
-            return done();
+          waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+            if(err) done(err);
+            person = colls.collections.user;
+            done();
           });
         });
 
         it('should not run beforeCreate and mutate values on find', function(done) {
           person.findOrCreate({ name: 'test' }, { name: 'test' }, function(err, user) {
-            if (err) {
-              return done(err);
-            }
-
+            assert(!err);
             assert(user.name === 'test');
-
-            return done();
+            done();
           });
         });
       });
     });
+
   });
+
+
+  /**
+   * Test Callbacks can be defined as arrays and run in order.
+   */
+
+  describe('array of functions', function() {
+
+    describe('without a record', function() {
+      var person;
+
+      before(function(done) {
+
+        var waterline = new Waterline();
+        var Model = Waterline.Collection.extend({
+          identity: 'user',
+          connection: 'foo',
+          attributes: {
+            name: 'string'
+          },
+
+          beforeCreate: [
+            // Function 1
+            function(values, cb) {
+              values.name = values.name + ' fn1';
+              cb();
+            },
+
+            // Function 2
+            function(values, cb) {
+              values.name = values.name + ' fn2';
+              cb();
+            }
+          ]
+        });
+
+        waterline.loadCollection(Model);
+
+        // Fixture Adapter Def
+        var adapterDef = {
+          find: function(con, col, criteria, cb) { return cb(null, null); },
+          create: function(con, col, values, cb) { return cb(null, values); }
+        };
+
+        var connections = {
+          'foo': {
+            adapter: 'foobar'
+          }
+        };
+
+        waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+          if(err) done(err);
+          person = colls.collections.user;
+          done();
+        });
+      });
+
+      it('should run the functions in order on create', function(done) {
+        person.findOrCreate({ name: 'test' }, { name: 'test' }, function(err, user) {
+          assert(!err);
+          assert(user.name === 'test fn1 fn2');
+          done();
+        });
+      });
+    });
+
+    describe('without a record', function() {
+      var person;
+
+      before(function(done) {
+
+        var waterline = new Waterline();
+        var Model = Waterline.Collection.extend({
+          identity: 'user',
+          connection: 'foo',
+          attributes: {
+            name: 'string'
+          },
+
+          beforeCreate: [
+            // Function 1
+            function(values, cb) {
+              values.name = values.name + ' fn1';
+              cb();
+            },
+
+            // Function 2
+            function(values, cb) {
+              values.name = values.name + ' fn2';
+              cb();
+            }
+          ]
+        });
+
+        waterline.loadCollection(Model);
+
+        // Fixture Adapter Def
+        var adapterDef = {
+          find: function(con, col, criteria, cb) { return cb(null, [criteria.where]); },
+          create: function(con, col, values, cb) { return cb(null, values); }
+        };
+
+        var connections = {
+          'foo': {
+            adapter: 'foobar'
+          }
+        };
+
+        waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+          if(err) done(err);
+          person = colls.collections.user;
+          done();
+        });
+      });
+
+      it('should now run any of the functions on find', function(done) {
+        person.findOrCreate({ name: 'test' }, { name: 'test' }, function(err, user) {
+          assert(!err);
+          assert(user.name === 'test');
+          done();
+        });
+      });
+    });
+  });
+
 });

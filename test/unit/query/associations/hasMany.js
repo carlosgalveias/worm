@@ -1,23 +1,23 @@
-var assert = require('assert');
-var _ = require('@sailshq/lodash');
-var Waterline = require('../../../../lib/waterline');
+var Waterline = require('../../../../lib/waterline'),
+    assert = require('assert');
 
-describe('Collection Query ::', function() {
+describe('Collection Query', function() {
+
   describe('has many association', function() {
-    var User;
-    var generatedQuery;
+    var User, generatedCriteria;
 
     before(function(done) {
+
       var waterline = new Waterline();
       var collections = {};
 
-      collections.user = Waterline.Model.extend({
+      collections.user = Waterline.Collection.extend({
         identity: 'user',
-        datastore: 'foo',
-        primaryKey: 'uuid',
+        connection: 'foo',
         attributes: {
           uuid: {
-            type: 'number'
+            type: 'string',
+            primaryKey: true
           },
           cars: {
             collection: 'car',
@@ -26,31 +26,27 @@ describe('Collection Query ::', function() {
         }
       });
 
-      collections.car = Waterline.Model.extend({
+      collections.car = Waterline.Collection.extend({
         identity: 'car',
-        datastore: 'foo',
-        primaryKey: 'id',
+        connection: 'foo',
         attributes: {
-          id: {
-            type: 'number'
-          },
           driver: {
             model: 'user'
           }
         }
       });
 
-      waterline.registerModel(collections.user);
-      waterline.registerModel(collections.car);
+      waterline.loadCollection(collections.user);
+      waterline.loadCollection(collections.car);
 
       // Fixture Adapter Def
       var adapterDef = {
         identity: 'foo',
-        join: function(con, query, cb) {
-          generatedQuery = query;
+        join: function(con, col, criteria, cb) {
+          generatedCriteria = criteria;
           return cb();
         },
-        find: function(con, query, cb) {
+        find: function(con, col, criteria, cb) {
           return cb();
         }
       };
@@ -61,32 +57,29 @@ describe('Collection Query ::', function() {
         }
       };
 
-      waterline.initialize({ adapters: { foobar: adapterDef }, datastores: connections }, function(err, orm) {
-        if (err) {
-          return done(err);
-        }
-        User = orm.collections.user;
-        return done();
+      waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+        if(err) done(err);
+        User = colls.collections.user;
+        done();
       });
     });
+
 
     it('should build a join query', function(done) {
       User.findOne(1)
       .populate('cars')
-      .exec(function(err) {
-        if(err) {
-          return done(err);
-        }
+      .exec(function(err, values) {
+        if(err) return done(err);
+        assert(generatedCriteria.joins[0].parent === 'user');
+        assert(generatedCriteria.joins[0].parentKey === 'uuid');
+        assert(generatedCriteria.joins[0].child === 'car');
+        assert(generatedCriteria.joins[0].childKey === 'driver');
+        assert(Array.isArray(generatedCriteria.joins[0].select));
+        assert(generatedCriteria.joins[0].removeParentKey === false);
 
-        assert.equal(generatedQuery.joins[0].parent, 'user');
-        assert.equal(generatedQuery.joins[0].parentKey, 'uuid');
-        assert.equal(generatedQuery.joins[0].child, 'car');
-        assert.equal(generatedQuery.joins[0].childKey, 'driver');
-        assert(_.isArray(generatedQuery.joins[0].criteria.select));
-        assert.equal(generatedQuery.joins[0].removeParentKey, false);
-
-        return done();
+        done();
       });
     });
+
   });
 });

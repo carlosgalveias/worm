@@ -1,6 +1,7 @@
-var BaseMetaModel = require('../../../../lib/waterline/MetaModel');
+var Collection = require('../../../../lib/waterline/collection');
 
-module.exports = BaseMetaModel.extend({
+// Extend for testing purposes
+var Model = Collection.extend({
   identity: 'user',
   adapter: 'test',
 
@@ -18,3 +19,5 @@ module.exports = BaseMetaModel.extend({
 
   }
 });
+
+module.exports = Model;

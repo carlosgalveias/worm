@@ -1,36 +1,34 @@
-var assert = require('assert');
-var Waterline = require('../../../lib/waterline');
+var Waterline = require('../../../lib/waterline'),
+    assert = require('assert');
 
-describe('Collection Query ::', function() {
+describe('Collection Query', function() {
+
   describe('.findOrCreate()', function() {
+
     describe('with proper values', function() {
       var query;
 
       before(function(done) {
+
         var waterline = new Waterline();
-        var Model = Waterline.Model.extend({
+        var Model = Waterline.Collection.extend({
           identity: 'user',
-          datastore: 'foo',
-          primaryKey: 'id',
-          fetchRecordsOnCreate: true,
-          fetchRecordsOnCreateEach: true,
+          connection: 'foo',
           attributes: {
-            id: {
-              type: 'number'
-            },
             name: {
               type: 'string',
               defaultsTo: 'Foo Bar'
-            }
+            },
+            doSomething: function() {}
           }
         });
 
-        waterline.registerModel(Model);
+        waterline.loadCollection(Model);
 
         // Fixture Adapter Def
         var adapterDef = {
-          find: function(con, query, cb) { return cb(null, []); },
-          create: function(con, query, cb) { query.newRecord.id = 1; return cb(null, query.newRecord); }
+          find: function(con, col, criteria, cb) { return cb(null, []); },
+          create: function(con, col, values, cb) { return cb(null, values); }
         };
 
         var connections = {
@@ -39,64 +37,73 @@ describe('Collection Query ::', function() {
           }
         };
 
-        waterline.initialize({ adapters: { foobar: adapterDef }, datastores: connections }, function(err, orm) {
-          if (err) {
-            return done(err);
-          }
-          query = orm.collections.user;
-          return done();
+        waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+          if(err) return done(err);
+          query = colls.collections.user;
+          done();
         });
       });
 
       it('should set default values', function(done) {
-        query.findOrCreate({ name: 'Foo Bar' }, {}, function(err, status, created) {
-          if (err) {
-            return done(err);
-          }
-
-          assert.equal(status.name, 'Foo Bar');
-          assert.equal(created, true);
-
-          return done();
+        query.findOrCreate({ name: 'Foo Bar' }, {}, function(err, status) {
+          assert(status.name === 'Foo Bar');
+          done();
         });
       });
 
       it('should set default values with exec', function(done) {
-        query.findOrCreate({ name: 'Foo Bar' }).exec(function(err, status, created) {
-          if (err) {
-            return done(err);
-          }
-
-          assert.equal(status.name, 'Foo Bar');
-          assert.equal(created, true);
-
-          return done();
+        query.findOrCreate({ name: 'Foo Bar' }).exec(function(err, status) {
+          assert(status.name === 'Foo Bar');
+          done();
         });
       });
 
+      it('should work with multiple objects', function(done) {
+        query.findOrCreate([{ name: 'Foo Bar' }, { name: 'Makis'}]).exec(function(err, status) {
+          assert(status[0].name === 'Foo Bar');
+          assert(status[1].name === 'Makis');
+          done();
+        });
+      });
 
+      it('should add timestamps', function(done) {
+        query.findOrCreate({ name: 'Foo Bar' }, {}, function(err, status) {
+          assert(status.createdAt);
+          assert(status.updatedAt);
+          done();
+        });
+      });
 
       it('should set values', function(done) {
-        query.findOrCreate({ name: 'Foo Bar' }, { name: 'Bob' }, function(err, status, created) {
-          if (err) {
-            return done(err);
-          }
-
-          assert.equal(status.name, 'Bob');
-          assert.equal(created, true);
-
-          return done();
+        query.findOrCreate({ name: 'Foo Bar' }, { name: 'Bob' }, function(err, status) {
+          assert(status.name === 'Bob');
+          done();
         });
       });
 
       it('should strip values that don\'t belong to the schema', function(done) {
         query.findOrCreate({ name: 'Foo Bar'}, { foo: 'bar' }, function(err, values) {
-          if (err) {
-            return done(err);
-          }
-
           assert(!values.foo);
-          return done();
+          done();
+        });
+      });
+
+      it('should return an instance of Model', function(done) {
+        query.findOrCreate({ name: 'Foo Bar' }, {}, function(err, status) {
+          assert(typeof status.doSomething === 'function');
+          done();
+        });
+      });
+
+      it('should allow a query to be built using deferreds', function(done) {
+        query.findOrCreate()
+        .where({ name: 'foo' })
+        .set({ name: 'bob' })
+        .exec(function(err, result) {
+          assert(!err);
+          assert(result);
+          assert(result.name === 'bob');
+          done();
         });
       });
     });
@@ -105,32 +112,23 @@ describe('Collection Query ::', function() {
       var query;
 
       before(function(done) {
+
         var waterline = new Waterline();
-        var Model = Waterline.Model.extend({
+        var Model = Waterline.Collection.extend({
           identity: 'user',
-          datastore: 'foo',
-          primaryKey: 'id',
-          fetchRecordsOnCreate: true,
-          fetchRecordsOnCreateEach: true,
+          connection: 'foo',
           attributes: {
-            id: {
-              type: 'number'
-            },
-            name: {
-              type: 'string'
-            },
-            age: {
-              type: 'number'
-            }
+            name: 'string',
+            age: 'integer'
           }
         });
 
-        waterline.registerModel(Model);
+        waterline.loadCollection(Model);
 
         // Fixture Adapter Def
         var adapterDef = {
-          find: function(con, query, cb) { return cb(null, []); },
-          create: function(con, query, cb) { query.newRecord.id = 1; return cb(null, query.newRecord); }
+          find: function(con, col, criteria, cb) { return cb(null, []); },
+          create: function(con, col, values, cb) { return cb(null, values); }
         };
 
         var connections = {
@@ -139,27 +137,21 @@ describe('Collection Query ::', function() {
           }
         };
 
-        waterline.initialize({ adapters: { foobar: adapterDef }, datastores: connections }, function(err, orm) {
-          if (err) {
-            return done(err);
-          }
-          query = orm.collections.user;
-          return done();
+        waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+          if(err) return done(err);
+          query = colls.collections.user;
+          done();
         });
       });
 
       it('should cast values before sending to adapter', function(done) {
-        query.findOrCreate({ name: 'Foo Bar' }, { name: 'foo', age: '27' }, function(err, values, created) {
-          if (err) {
-            return done(err);
-          }
-          assert.equal(values.name, 'foo');
-          assert.equal(values.age, 27);
-          assert.equal(created, true);
-
-          return done();
+        query.findOrCreate({ name: 'Foo Bar' }, { name: 'foo', age: '27' }, function(err, values) {
+          assert(values.name === 'foo');
+          assert(values.age === 27);
+          done();
         });
       });
     });
+
   });
 });

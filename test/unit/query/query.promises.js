@@ -1,33 +1,32 @@
-var assert = require('assert');
-var Waterline = require('../../../lib/waterline');
+var Waterline = require('../../../lib/waterline'),
+    assert = require('assert');
 
-describe('Collection Promise ::', function() {
-  describe('.then()', function() {
+describe('Collection Promise', function () {
+
+  describe('.then()', function () {
     var query;
 
-    before(function(done) {
+    before(function (done) {
+
       var waterline = new Waterline();
-      var Model = Waterline.Model.extend({
+      var Model = Waterline.Collection.extend({
         identity: 'user',
-        datastore: 'foo',
-        primaryKey: 'id',
+        connection: 'foo',
         attributes: {
-          id: {
-            type: 'number'
-          },
           name: {
             type: 'string',
             defaultsTo: 'Foo Bar'
-          }
+          },
+          doSomething: function () {}
         }
       });
 
-      waterline.registerModel(Model);
+      waterline.loadCollection(Model);
 
       // Fixture Adapter Def
       var adapterDef = {
-        find: function(con, query, cb) {
-          return cb(undefined, [{id: 1, criteria: query.criteria}]);
+        find: function (con, col, criteria, cb) {
+          return cb(null, [criteria]);
         }
       };
 
@@ -37,35 +36,42 @@ describe('Collection Promise ::', function() {
         }
       };
 
-      waterline.initialize({ adapters: { foobar: adapterDef }, datastores: connections }, function(err, orm) {
-        if (err) {
-          return done(err);
-        }
-
-        query = orm.collections.user;
-        return done();
+      waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+        if (err) return done(err);
+        query = colls.collections.user;
+        done();
       });
     });
 
-    it('should return a promise object', function(done) {
-      query.find({}).then(function(obj) {
+    it('should return a promise object', function (done) {
+      var promise = query.find({}).then(function (obj) {
         assert(obj);
         return 'test';
-      }).then(function(test) {
-        assert.equal(test, 'test');
-        return done();
-      }).catch(function(err) {
-        return done(err);
+      }).then(function (test) {
+        assert(test === 'test');
+        done();
+      }).catch(function (err) {
+        done(err);
       });
     });
 
-    it('should reject the promise if the then handler fails', function(done) {
-      query.find({}).then(function() {
+    it('should reject the promise if the then handler fails', function (done) {
+      var promise = query.find({}).then(function (obj) {
         throw new Error("Error in promise handler");
-      }).then(function() {
-        return done(new Error('Unexpected success'));
-      }).catch(function() {
-        return done();
+      }).then(function (unexpected) {
+        done(new Error("Unexpected success"));
+      }).catch(function (expected) {
+        done();
+      });
+    });
+
+    it('should reject the promise if the spread handler fails', function (done) {
+      var promise = query.find({}).spread(function (obj) {
+        throw new Error("Error in promise handler");
+      }).then(function (unexpected) {
+        done(new Error("Unexpected success"));
+      }).catch(function (expected) {
+        done();
       });
     });
 
@@ -73,16 +79,16 @@ describe('Collection Promise ::', function() {
       var promise = query.find({});
       var prevResult;
       promise
-      .then(function(result) {
-        prevResult = result;
-        return promise;
-      }).then(function(result) {
-        assert.strictEqual(result, prevResult, 'Previous and current result should be equal');
-        done();
-      })
-      .catch(function(err) {
-        done(err);
-      });
+        .then(function(result){
+          prevResult = result;
+          return promise;
+        }).then(function(result){
+          assert.strictEqual(result, prevResult, "Previous and current result should be equal");
+          done();
+        })
+        .catch(function(err){
+          done(err);
+        });
     });
   });
 });

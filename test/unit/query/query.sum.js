@@ -1,36 +1,29 @@
-var assert = require('assert');
-var _ = require('@sailshq/lodash');
-var Waterline = require('../../../lib/waterline');
+var Waterline = require('../../../lib/waterline'),
+    assert = require('assert');
 
-describe('Collection Query ::', function() {
-  describe('.sum()', function() {
+describe('Collection sum', function () {
+
+  describe('.sum()', function () {
     var query;
 
-    before(function(done) {
+    before(function (done) {
+
       var waterline = new Waterline();
-      var Model = Waterline.Model.extend({
+      var Model = Waterline.Collection.extend({
         identity: 'user',
-        datastore: 'foo',
-        primaryKey: 'id',
+        connection: 'foo',
         attributes: {
-          id: {
-            type: 'number'
-          },
-          age: {
-            type: 'number'
-          },
-          percent: {
-            type: 'number'
-          }
+          age: 'integer',
+          percent: 'float'
         }
       });
 
-      waterline.registerModel(Model);
+      waterline.loadCollection(Model);
 
       // Fixture Adapter Def
       var adapterDef = {
-        sum: function(con, query, cb) {
-          return cb(undefined, [query]);
+        find: function (con, col, criteria, cb) {
+          return cb(null, [criteria]);
         }
       };
 
@@ -40,34 +33,36 @@ describe('Collection Query ::', function() {
         }
       };
 
-      waterline.initialize({ adapters: { foobar: adapterDef }, datastores: connections }, function(err, orm) {
-        if (err) {
-          return done(err);
-        }
-        query = orm.collections.user;
-        return done();
+      waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+        if (err) return done(err);
+        query = colls.collections.user;
+        done();
       });
     });
 
-    it('should return criteria with sum set', function(done) {
-      query.sum('age')
-      .exec(function(err, obj) {
-        if (err) {
-          return done(err);
-        }
+    it('should return criteria with sum set', function (done) {
+      query.find()
+      .sum('age', 'percent')
+      .exec(function (err, obj) {
+        if (err) return done(err);
 
-        assert.equal(_.first(obj).method, 'sum');
-        assert.equal(_.first(obj).numericAttrName, 'age');
-        return done();
+        assert(obj[0].sum[0] === 'age');
+        assert(obj[0].sum[1] === 'percent');
+        done();
       });
     });
 
-    it('should NOT accept an array', function(done) {
-      query.sum(['age', 'percent'])
-      .exec(function(err) {
-        assert(err);
-        return done();
+    it('should accept an array', function (done) {
+      query.find()
+      .sum(['age', 'percent'])
+      .exec(function (err, obj) {
+        if (err) return done(err);
+
+        assert(obj[0].sum[0] === 'age');
+        assert(obj[0].sum[1] === 'percent');
+        done();
       });
     });
+
   });
 });

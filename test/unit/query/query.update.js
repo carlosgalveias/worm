@@ -1,39 +1,36 @@
-var assert = require('assert');
-var Waterline = require('../../../lib/waterline');
+var Waterline = require('../../../lib/waterline'),
+    assert = require('assert');
 
-describe('Collection Query ::', function() {
+describe('Collection Query', function() {
+
   describe('.update()', function() {
+
     describe('with proper values', function() {
       var query;
 
       before(function(done) {
+
         var waterline = new Waterline();
-        var Model = Waterline.Model.extend({
+        var Model = Waterline.Collection.extend({
           identity: 'user',
-          datastore: 'foo',
-          primaryKey: 'id',
+          connection: 'foo',
           attributes: {
-            id: {
-              type: 'number'
-            },
             name: {
               type: 'string',
               defaultsTo: 'Foo Bar'
             },
             age: {
-              type: 'number'
+              type: 'integer',
+              required: true
             },
-            updatedAt: {
-              type: 'number',
-              autoUpdatedAt: true
-            }
+            doSomething: function() {}
           }
         });
 
-        waterline.registerModel(Model);
+        waterline.loadCollection(Model);
 
         // Fixture Adapter Def
-        var adapterDef = { update: function(con, query, cb) { query.valuesToSet.id = 1; return cb(null, [query.valuesToSet]); }};
+        var adapterDef = { update: function(con, col, criteria, values, cb) { return cb(null, [values]); }};
 
         var connections = {
           'foo': {
@@ -41,93 +38,73 @@ describe('Collection Query ::', function() {
           }
         };
 
-        waterline.initialize({ adapters: { foobar: adapterDef }, datastores: connections }, function(err, orm) {
-          if (err) {
-            return done(err);
-          }
-
-          query = orm.collections.user;
-          return done();
+        waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+          if(err) return done(err);
+          query = colls.collections.user;
+          done();
         });
       });
 
       it('should change the updatedAt timestamp', function(done) {
         query.update({}, { name: 'foo' }, function(err, status) {
-          if (err) {
-            return done(err);
-          }
-
           assert(status[0].updatedAt);
-          return done();
-        }, { fetch: true });
+          done();
+        });
       });
 
       it('should set values', function(done) {
         query.update({}, { name: 'foo' }, function(err, status) {
-          if (err) {
-            return done(err);
-          }
-
-          assert.equal(status[0].name, 'foo');
-          return done();
-        }, { fetch: true });
+          assert(status[0].name === 'foo');
+          done();
+        });
       });
 
       it('should strip values that don\'t belong to the schema', function(done) {
         query.update({}, { foo: 'bar' }, function(err, values) {
-          if (err) {
-            return done(err);
-          }
-
           assert(!values.foo);
-          return done();
-        }, { fetch: true });
+          done();
+        });
+      });
+
+      it('should return an instance of Model', function(done) {
+        query.update({}, { name: 'foo' }, function(err, status) {
+          assert(typeof status[0].doSomething === 'function');
+          done();
+        });
       });
 
       it('should allow a query to be built using deferreds', function(done) {
         query.update()
         .where({})
         .set({ name: 'foo' })
-        .meta({
-          fetch: true
-        })
         .exec(function(err, results) {
-          if (err) {
-            return done(err);
-          }
-
-          assert.equal(results[0].name, 'foo');
-          return done();
+          assert(!err);
+          assert(results[0].name === 'foo');
+          done();
         });
       });
+
     });
 
     describe('casting values', function() {
       var query;
 
       before(function(done) {
+
         var waterline = new Waterline();
-        var Model = Waterline.Model.extend({
+        var Model = Waterline.Collection.extend({
           identity: 'user',
-          datastore: 'foo',
-          primaryKey: 'id',
+          connection: 'foo',
           attributes: {
-            id: {
-              type: 'number'
-            },
-            name: {
-              type: 'string'
-            },
-            age: {
-              type: 'number'
-            }
+            name: 'string',
+            age: 'integer'
           }
         });
 
-        waterline.registerModel(Model);
+        waterline.loadCollection(Model);
 
         // Fixture Adapter Def
-        var adapterDef = { update: function(con, query, cb) { query.valuesToSet.id = 1; return cb(null, [query.valuesToSet]); }};
+        var adapterDef = { update: function(con, col, criteria, values, cb) { return cb(null, [values]); }};
 
         var connections = {
           'foo': {
@@ -135,25 +112,19 @@ describe('Collection Query ::', function() {
           }
         };
 
-        waterline.initialize({ adapters: { foobar: adapterDef }, datastores: connections }, function(err, orm) {
-          if (err) {
-            return done(err);
-          }
-          query = orm.collections.user;
-          return done();
+        waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+          if(err) return done(err);
+          query = colls.collections.user;
+          done();
         });
       });
 
       it('should cast values before sending to adapter', function(done) {
         query.update({}, { name: 'foo', age: '27' }, function(err, values) {
-          if (err) {
-            return done(err);
-          }
-
-          assert.equal(values[0].name, 'foo');
-          assert.equal(values[0].age, 27);
-          return done();
-        }, { fetch: true });
+          assert(values[0].name === 'foo');
+          assert(values[0].age === 27);
+          done();
+        });
       });
     });
 
@@ -161,27 +132,30 @@ describe('Collection Query ::', function() {
       var query;
 
       before(function(done) {
+
         var waterline = new Waterline();
-        var Model = Waterline.Model.extend({
+        var Model = Waterline.Collection.extend({
           identity: 'user',
-          datastore: 'foo',
-          primaryKey: 'myPk',
+          connection: 'foo',
+          autoPK: false,
           attributes: {
             name: {
               type: 'string',
               defaultsTo: 'Foo Bar'
             },
             myPk: {
-              type: 'number',
-              columnName: 'pkColumn'
+              type: 'integer',
+              primaryKey: true,
+              columnName: 'pkColumn',
+              defaultsTo: 1
             }
           }
         });
 
-        waterline.registerModel(Model);
+        waterline.loadCollection(Model);
 
         // Fixture Adapter Def
-        var adapterDef = { update: function(con, query, cb) { return cb(null, [{myPk: 1, criteria: query.criteria}]); }};
+        var adapterDef = { update: function(con, col, criteria, values, cb) { return cb(null, [criteria]); }};
 
         var connections = {
           'foo': {
@@ -189,26 +163,22 @@ describe('Collection Query ::', function() {
           }
         };
 
-        waterline.initialize({ adapters: { foobar: adapterDef }, datastores: connections }, function(err, orm) {
-          if (err) {
-            return done(err);
-          }
-
-          query = orm.collections.user;
-          return done();
+        waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+          if(err) done(err);
+          query = colls.collections.user;
+          done();
         });
       });
 
+
       it('should use the custom primary key when a single value is passed in', function(done) {
         query.update(1, { name: 'foo' }, function(err, values) {
-          if (err) {
-            return done(err);
-          }
-
-          assert.equal(values[0].criteria.where.pkColumn, 1);
-          return done();
-        }, { fetch: true });
+          assert(!err);
+          assert(values[0].where.pkColumn === 1);
+          done();
+        });
       });
     });
+
   });
 });

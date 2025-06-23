@@ -1,61 +1,38 @@
-var assert = require('assert');
-var _ = require('@sailshq/lodash');
-var Waterline = require('../../../lib/waterline');
+var Waterline = require('../../../lib/waterline'),
+    assert = require('assert');
 
-describe('Collection Query ::', function() {
+describe('Collection Query', function() {
+
   describe('.create()', function() {
+
     describe('with transformed values', function() {
-      var modelDef = {
-        identity: 'user',
-        datastore: 'foo',
-        primaryKey: 'id',
-        fetchRecordsOnCreate: true,
-        attributes: {
-          id: {
-            type: 'number'
-          },
-          name: {
-            type: 'string',
-            columnName: 'login'
-          }
-        }
-      };
+      var Model;
 
-      it('should transform values before sending to adapter', function(done) {
-        var waterline = new Waterline();
-        waterline.registerModel(Waterline.Model.extend(_.extend({}, modelDef)));
+      before(function() {
 
-        // Fixture Adapter Def
-        var adapterDef = {
-          create: function(con, query, cb) {
-            assert(query.newRecord.login);
-            return cb(null, query.newRecord);
-          }
-        };
+        Model = Waterline.Collection.extend({
+          identity: 'user',
+          connection: 'foo',
 
-        var connections = {
-          'foo': {
-            adapter: 'foobar'
+          attributes: {
+            name: {
+              type: 'string',
+              columnName: 'login'
+            }
           }
-        };
-
-        waterline.initialize({ adapters: { foobar: adapterDef }, datastores: connections }, function(err, orm) {
-          if (err) {
-            return done(err);
-          }
-          orm.collections.user.create({ name: 'foo', id: 1 }, done);
         });
       });
 
-      it('should transform values after receiving from adapter', function(done) {
+      it('should transform values before sending to adapter', function(done) {
+
         var waterline = new Waterline();
-        waterline.registerModel(Waterline.Model.extend(_.extend({}, modelDef)));
+        waterline.loadCollection(Model);
 
         // Fixture Adapter Def
         var adapterDef = {
-          create: function(con, query, cb) {
-            assert(query.newRecord.login);
-            return cb(null, query.newRecord);
+          create: function(con, col, values, cb) {
+            assert(values.login);
+            return cb(null, values);
           }
         };
 
@@ -65,22 +42,42 @@ describe('Collection Query ::', function() {
           }
         };
 
-        waterline.initialize({ adapters: { foobar: adapterDef }, datastores: connections }, function(err, orm) {
-          if (err) {
-            return done(err);
+        waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+          if(err) return done(err);
+          colls.collections.user.create({ name: 'foo' }, done);
+        });
+
+      });
+
+      it('should transform values after receiving from adapter', function(done) {
+
+        var waterline = new Waterline();
+        waterline.loadCollection(Model);
+
+        // Fixture Adapter Def
+        var adapterDef = {
+          create: function(con, col, values, cb) {
+            assert(values.login);
+            return cb(null, values);
           }
+        };
 
-          orm.collections.user.create({ name: 'foo', id: 1 }, function(err, values) {
-            if (err) {
-              return done(err);
-            }
+        var connections = {
+          'foo': {
+            adapter: 'foobar'
+          }
+        };
 
+        waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+          if(err) return done(err);
+          colls.collections.user.create({ name: 'foo' }, function(err, values) {
             assert(values.name);
             assert(!values.login);
-            return done();
+            done();
           });
         });
       });
     });
+
   });
 });

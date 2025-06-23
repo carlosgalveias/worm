@@ -1,34 +1,33 @@
-var assert = require('assert');
-var async = require('async');
-var Waterline = require('../../../lib/waterline');
+var Waterline = require('../../../lib/waterline'),
+  assert = require('assert'),
+  async = require('async');
 
-describe('Collection Query ::', function() {
+describe('Collection Query', function() {
+
   describe('.exec()', function() {
     var query;
 
     before(function(done) {
+
       var waterline = new Waterline();
-      var Model = Waterline.Model.extend({
+      var Model = Waterline.Collection.extend({
         identity: 'user',
-        datastore: 'foo',
-        primaryKey: 'id',
+        connection: 'foo',
         attributes: {
-          id: {
-            type: 'number'
-          },
           name: {
             type: 'string',
             defaultsTo: 'Foo Bar'
-          }
+          },
+          doSomething: function() {}
         }
       });
 
-      waterline.registerModel(Model);
+      waterline.loadCollection(Model);
 
       // Fixture Adapter Def
       var adapterDef = {
-        find: function(con, query, cb) {
-          return cb(null, [{id: 1}]);
+        find: function(con, col, criteria, cb) {
+          return cb(null, [criteria]);
         }
       };
 
@@ -38,13 +37,10 @@ describe('Collection Query ::', function() {
         }
       };
 
-      waterline.initialize({ adapters: { foobar: adapterDef }, datastores: connections }, function(err, orm) {
-        if (err) {
-          return done(err);
-        }
-
-        query = orm.collections.user;
-        return done();
+      waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+        if (err) return done(err);
+        query = colls.collections.user;
+        done();
       });
     });
 
@@ -52,53 +48,53 @@ describe('Collection Query ::', function() {
       // .exec() usage
       query.find()
       .exec(function(err, results0) {
-        if (err) {
-          return done(err);
-        }
+        assert(!err);
 
         // callback usage
-        query.find({}, {}, function(err, results1) {
-          if (err) {
-            return done(err);
-          }
-          assert.equal(results0.length, results1.length);
-          return done();
+        query.find(function (err, results1) {
+          assert(!err);
+          assert(results0.length === results1.length);
         });
+        done();
       });
     });
 
-    describe.skip('when passed a switchback (object with multiple handlers)', function() {
-      var _error;
-      var _results;
+    describe('when passed a switchback (object with multiple handlers)', function () {
 
       before(function getTheQueryResultsForTestsBelow(done) {
+        var self = this;
+
         async.auto({
-          objUsage: function(cb) {
+          objUsage: function (cb) {
             query.find()
             .exec({
-              success: function(results) {
+              success: function (results) {
                 cb(null, results);
               },
               error: cb
             });
           },
-
-          cbUsage: function(cb) {
+          cbUsage: function (cb) {
             query.find().exec(cb);
           }
-
-        }, function asyncComplete(err, async_data) {
+        }, function asyncComplete (err, async_data) {
           // Save results for use below
-          _error = err;
-          _results = async_data;
-          return done();
+          self._error = err;
+          self._results = async_data;
+          done();
         });
+
       });
 
-      it('should not fail, and should work the same as it does w/ a callback', function() {
-        assert(!_error, _error);
-        assert.equal(_results.cbUsage.length, _results.objUsage.length);
+      it('should not fail', function() {
+        assert(this._results);
+        assert(!this._error);
+      });
+
+      it('should work the same as it does with a callback', function() {
+        assert(this._results.cbUsage.length === this._results.objUsage.length);
       });
     });
+
   });
 });

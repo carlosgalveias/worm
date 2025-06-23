@@ -1,40 +1,35 @@
-var assert = require('assert');
-var Waterline = require('../../../lib/waterline');
+var Waterline = require('../../../lib/waterline'),
+    assert = require('assert');
 
-describe('After Destroy Lifecycle Callback ::', function() {
-  describe('Destroy ::', function() {
-    var person;
-    var status;
+describe('.afterDestroy()', function() {
+
+  describe('basic function', function() {
+    var person, status;
 
     before(function(done) {
       var waterline = new Waterline();
-      var Model = Waterline.Model.extend({
+      var Model = Waterline.Collection.extend({
         identity: 'user',
-        datastore: 'foo',
-        primaryKey: 'id',
-        fetchRecordsOnCreate: true,
-        fetchRecordsOnDestroy: true,
+        connection: 'foo',
         attributes: {
-          id: {
-            type: 'number'
-          },
-          name: {
-            type: 'string'
-          }
+          name: 'string'
         },
 
-        afterDestroy: function(destroyedRecord, cb) {
-          status = destroyedRecord.status;
-          cb();
+        afterDestroy: function(values, cb) {
+          person.create({ test: 'test' }, function(err, result) {
+            if(err) return cb(err);
+            status = result.status;
+            cb();
+          });
         }
       });
 
-      waterline.registerModel(Model);
+      waterline.loadCollection(Model);
 
       // Fixture Adapter Def
       var adapterDef = {
-        destroy: function(con, query, cb) { return cb(undefined, [{ status: true, id: 1 }]); },
-        create: function(con, query, cb) { return cb(undefined, { status: true, id: 1 }); }
+        destroy: function(con, col, options, cb) { return cb(null, options); },
+        create: function(con, col, options, cb) { return cb(null, { status: true }); }
       };
 
       var connections = {
@@ -43,24 +38,89 @@ describe('After Destroy Lifecycle Callback ::', function() {
         }
       };
 
-      waterline.initialize({ adapters: { foobar: adapterDef }, datastores: connections }, function(err, orm) {
-        if (err) {
-          return done(err);
-        }
-        person = orm.collections.user;
-        return done();
+      waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+        if(err) done(err);
+        person = colls.collections.user;
+        done();
       });
     });
 
-    it('should run afterDestroy', function(done) {
-      person.destroy({ name: 'test' }, function(err) {
-        if (err) {
-          return done(err);
-        }
+    /**
+     * Destroy
+     */
 
-        assert.equal(status, true);
-        return done();
+    describe('.destroy()', function() {
+
+      it('should run afterDestroy', function(done) {
+        person.destroy({ name: 'test' }, function(err) {
+          assert(!err);
+          assert(status === true);
+          done();
+        });
       });
     });
   });
+
+
+  /**
+   * Test Callbacks can be defined as arrays and run in order.
+   */
+
+  describe('array of functions', function() {
+    var person, status;
+
+    before(function(done) {
+      var waterline = new Waterline();
+      var Model = Waterline.Collection.extend({
+        identity: 'user',
+        connection: 'foo',
+        attributes: {
+          name: 'string'
+        },
+
+        afterDestroy: [
+          // Function 1
+          function(values, cb) {
+            status = 'fn1 ';
+            cb();
+          },
+
+          // Function 2
+          function(values, cb) {
+            status = status + 'fn2';
+            cb();
+          }
+        ]
+      });
+
+      // Fixture Adapter Def
+      var adapterDef = {
+        destroy: function(con, col, options, cb) { return cb(null, options); },
+        create: function(con, col, options, cb) { return cb(null, { status: true }); }
+      };
+
+      waterline.loadCollection(Model);
+
+      var connections = {
+        'foo': {
+          adapter: 'foobar'
+        }
+      };
+
+      waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+        if(err) done(err);
+        person = colls.collections.user;
+        done();
+      });
+    });
+
+    it('should run the functions in order', function(done) {
+      person.destroy({ name: 'test' }, function(err) {
+        assert(!err);
+        assert(status === 'fn1 fn2');
+        done();
+      });
+    });
+  });
+
 });

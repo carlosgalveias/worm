@@ -1,21 +1,21 @@
-var assert = require('assert');
-var Waterline = require('../../../lib/waterline');
+var Waterline = require('../../../lib/waterline'),
+    assert = require('assert');
 
-describe('Collection Query ::', function() {
+describe('Collection Query', function() {
+
   describe('.destroy()', function() {
+
     describe('with transformed values', function() {
       var Model;
 
       before(function() {
+
         // Extend for testing purposes
-        Model = Waterline.Model.extend({
+        Model = Waterline.Collection.extend({
           identity: 'user',
-          datastore: 'foo',
-          primaryKey: 'id',
+          connection: 'foo',
+
           attributes: {
-            id: {
-              type: 'number'
-            },
             name: {
               type: 'string',
               columnName: 'login'
@@ -25,14 +25,15 @@ describe('Collection Query ::', function() {
       });
 
       it('should transform values before sending to adapter', function(done) {
+
         var waterline = new Waterline();
-        waterline.registerModel(Model);
+        waterline.loadCollection(Model);
 
         // Fixture Adapter Def
         var adapterDef = {
-          destroy: function(con, query, cb) {
-            assert(query.criteria.where.login);
-            return cb();
+          destroy: function(con, col, options, cb) {
+            assert(options.where.login);
+            return cb(null);
           }
         };
 
@@ -42,13 +43,12 @@ describe('Collection Query ::', function() {
           }
         };
 
-        waterline.initialize({ adapters: { foobar: adapterDef }, datastores: connections }, function(err, orm) {
-          if (err) {
-            return done(err);
-          }
-          orm.collections.user.destroy({ name: 'foo' }, done);
+        waterline.initialize({ adapters: { foobar: adapterDef }, connections: connections }, function(err, colls) {
+          if(err) return done(err);
+          colls.collections.user.destroy({ name: 'foo' }, done);
         });
       });
     });
+
   });
 });
