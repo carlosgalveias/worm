@@ -1,5 +1,5 @@
 var Waterline = require('../../../../lib/waterline'),
-    Schema = require('../../../../lib/schema/waterline-schema.js'),
+    Schema = require('../../../../lib/schema'),
     Transformer = require('../../../../lib/waterline/core/transformations'),
     assert = require('assert');
 
