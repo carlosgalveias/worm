@@ -1,0 +1,16 @@
+{
+  "waterlineAdapter":
+  {
+    "waterlineVersion": "~0.10.0",
+    "interfaces": [
+      "semantic",
+      "queryable",
+      "associations"
+    ],
+    "features": [
+      "cross-adapter",
+      "unique",
+      "autoIncrement.sequential"
+    ]
+  }
+}

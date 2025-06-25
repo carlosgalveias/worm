@@ -110,7 +110,7 @@ describe('Collection Query', function() {
         }
       };
 
-      waterline.initialize({adapters: {adapter: require('sails-memory')}, connections: connections}, function(err, colls) {
+      waterline.initialize({adapters: {adapter: require('../../../../lib/adapters/worm-memory/adapter.js')}, connections: connections}, function(err, colls) {
         if (err) {
           done(err);
         }

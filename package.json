@@ -1,7 +1,7 @@
 {
   "name": "water-orm",
-  "description": "An ORM for Node.js and the Sails framework",
-  "version": "0.0.2",
+  "description": "A monolith version of Standalone waterline ORM",
+  "version": "0.0.3",
   "homepage": "",
   "contributors": [
     {
@@ -19,14 +19,16 @@
     "bluebird": "3.2.1",
     "deep-diff": "0.3.4",
     "lodash": "^4.17.21",
+    "pg": "^8.16.2",
     "prompt": "^1.3.0",
+    "qs": "^6.14.0",
     "switchback": "^2.0.5"
   },
   "devDependencies": {
+    "captains-log": "^2.0.5",
     "eslint": "^8.43.0",
     "espree": "^9.5.2",
     "mocha": "^10.2.0",
-    "sails-memory": "https://github.com/carlosgalveias/sails-memory.git#v0.11.0",
     "should": "9.0.0"
   },
   "keywords": [
@@ -41,10 +43,12 @@
     "sails",
     "sails.js"
   ],
-  "repository": "git://github.com/balderdashy/waterline.git",
+  "repository": "git://github.com/carlosgalveias/worm.git",
   "main": "./lib/waterline",
   "scripts": {
     "test": "node ./node_modules/mocha/bin/mocha test/integration test/structure test/support test/unit --recursive",
+    "testAdapters": "node ./node_modules/mocha/bin/mocha test/adapters --recursive",
+    "testMemory": "node ./node_modules/mocha/bin/mocha test/adapters/worm-memory --recursive",
     "prepublish": "npm prune"
   },
   "engines": {

@@ -1,0 +1,19 @@
+{
+  "waterlineAdapter":
+  {
+    "waterlineVersion": "~0.13.0",
+    "interfaces": [
+      "semantic",
+      "queryable",
+      "migratable",
+      "associations",
+      "sql"
+    ],
+    "features": [
+      "crossAdapter",
+      "unique",
+      "autoIncrement",
+      "schemas"
+    ]
+  }
+}
