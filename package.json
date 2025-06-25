@@ -1,7 +1,7 @@
 {
   "name": "water-orm",
   "description": "A monolith version of Standalone waterline ORM",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "homepage": "",
   "contributors": [
     {
